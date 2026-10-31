@@ -55,6 +55,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .receipt .tick{width:56px;height:56px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:grid;place-items:center;margin:0 auto;font-size:30px;font-weight:800}
 .receipt dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;text-align:left;margin:6px 0 0;font-size:14px}
 .receipt dt{color:var(--muted)} .receipt dd{margin:0;font-weight:600;font-family:var(--f-mono)}
+.bind{font-size:12px;font-weight:500;color:var(--muted)}
+input[readonly]{opacity:.75}
 .note{font-size:12px;color:var(--muted);text-align:center}
 @media (prefers-reduced-motion:no-preference){.pulse{animation:p 1.6s ease-out infinite}@keyframes p{0%{r:5;opacity:.6}100%{r:14;opacity:0}}}
 </style>
@@ -66,7 +68,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
     <h1>Điểm danh</h1>
   </header>
 
-  <section class="panel" aria-live="polite">
+  <section class="panel" id="gpsPanel" aria-live="polite">
     <div class="gauge">
       <svg id="radar" viewBox="0 0 120 120" role="img" aria-label="Vị trí của bạn so với trường">
         <circle cx="60" cy="60" r="56" fill="none" stroke="var(--line)" stroke-dasharray="3 4"/>
@@ -98,6 +100,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
       </label>
       <label for="mssv">MSSV
         <input id="mssv" name="mssv" inputmode="numeric" pattern="\d{6,10}" maxlength="10" placeholder="23147043" required>
+        <span id="bindNote" class="bind" hidden></span>
       </label>
       <div id="formMsg" class="msg bad" hidden></div>
       <button id="submit" type="submit" disabled>Check-in</button>
@@ -115,7 +118,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
     </dl>
   </section>
 
-  <p class="note">Nút Check-in chỉ mở khi bạn ở trong khuôn viên trường.</p>
+  <p class="note" id="footNote">Nút Check-in chỉ mở khi bạn ở trong khuôn viên trường.</p>
 </div>
 
 <script>
@@ -131,7 +134,60 @@ let pos = null, watchId = null, sending = false;
 
 $("rad").textContent = RADIUS_M + " m";
 
-try { $("name").value = localStorage.getItem("ci_name") || ""; $("mssv").value = localStorage.getItem("ci_mssv") || ""; } catch(e){}
+/* --- Bộ nhớ trên máy: localStorage + cookie (dự phòng nếu 1 trong 2 bị xoá) --- */
+function store(k, v){
+  try { localStorage.setItem(k, v); } catch(e){}
+  document.cookie = k + "=" + encodeURIComponent(v) + ";max-age=34560000;path=/;SameSite=Lax";
+}
+function load(k){
+  let v = null;
+  try { v = localStorage.getItem(k); } catch(e){}
+  if (!v){ const m = document.cookie.match("(?:^|; )" + k + "=([^;]*)"); if (m) v = decodeURIComponent(m[1]); }
+  return v;
+}
+function todayVN(){
+  return new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Ho_Chi_Minh", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
+}
+
+// Mã thiết bị: tạo 1 lần, giữ mãi trên máy
+let DEVICE = load("ci_device");
+if (!DEVICE){
+  DEVICE = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
+  store("ci_device", DEVICE);
+} else store("ci_device", DEVICE);
+
+// "Vân tay" trình duyệt: không đổi khi xoá dữ liệu/ẩn danh, dùng để cảnh báo
+let FP = "";
+(async () => {
+  try {
+    const s = [navigator.userAgent, screen.width + "x" + screen.height, devicePixelRatio, navigator.language,
+               Intl.DateTimeFormat().resolvedOptions().timeZone, navigator.hardwareConcurrency, navigator.maxTouchPoints, navigator.platform].join("|");
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+    FP = [...new Uint8Array(buf)].slice(0, 8).map(b => b.toString(16).padStart(2, "0")).join("");
+  } catch(e){}
+})();
+
+// Điện thoại đã gắn MSSV thì khoá ô MSSV
+const boundMssv = load("ci_mssv");
+$("name").value = load("ci_name") || "";
+if (boundMssv){
+  $("mssv").value = boundMssv; $("mssv").readOnly = true;
+  $("bindNote").hidden = false; $("bindNote").textContent = "Điện thoại này đã đăng ký cho MSSV " + boundMssv + ".";
+}
+
+function showReceipt(r){
+  $("rName").textContent = r.name; $("rMssv").textContent = r.mssv;
+  $("rTime").textContent = r.time + " · " + r.day.split("-").reverse().join("/");
+  $("rDist").textContent = r.distance != null ? r.distance + " m" : "—";
+  $("formPanel").hidden = true; $("receipt").hidden = false; $("gpsPanel").hidden = true;
+  $("footNote").textContent = "Mỗi điện thoại chỉ check-in 1 lần mỗi ngày.";
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+}
+
+// Đã check-in hôm nay trên máy này → hiện biên nhận, không cho gửi lại
+let cached = null;
+try { cached = JSON.parse(load("ci_receipt") || "null"); } catch(e){}
+const doneToday = cached && cached.day === todayVN();
 
 function haversine(a, b, c, d){
   const R = 6371000, r = Math.PI/180, dLat = (c-a)*r, dLng = (d-b)*r;
@@ -195,8 +251,9 @@ function startGPS(){
 }
 
 $("locBtn").addEventListener("click", startGPS);
+if (doneToday) showReceipt(cached);
 // Tự bật nếu đã được cấp quyền trước đó
-if (navigator.permissions) navigator.permissions.query({name:"geolocation"}).then(r => { if (r.state === "granted") startGPS(); }).catch(()=>{});
+else if (navigator.permissions) navigator.permissions.query({name:"geolocation"}).then(r => { if (r.state === "granted") startGPS(); }).catch(()=>{});
 
 $("form").addEventListener("submit", async ev => {
   ev.preventDefault();
@@ -207,20 +264,24 @@ $("form").addEventListener("submit", async ev => {
   if (state() !== "ok") return;
   if (!API_URL){ fm.hidden=false; fm.textContent="Chưa cấu hình API_URL trong index.html."; return; }
 
+  if (sending) return;
   sending = true; $("submit").textContent = "Đang gửi…"; render();
   try {
     const res = await fetch(API_URL, {
       method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" },
-      body: JSON.stringify({ name, mssv, lat:pos.lat, lng:pos.lng, accuracy:pos.acc, ua:navigator.userAgent })
+      body: JSON.stringify({ name, mssv, lat:pos.lat, lng:pos.lng, accuracy:pos.acc, device:DEVICE, fp:FP, ua:navigator.userAgent })
     });
     const data = await res.json();
+    if (!data.ok && data.duplicate && data.time){
+      // Đã check-in từ trước (vd. xoá cache) → khôi phục biên nhận
+      const r = { name, mssv, time:data.time, day:data.day, distance:null };
+      store("ci_receipt", JSON.stringify(r)); showReceipt(r); return;
+    }
     if (!data.ok) throw new Error(data.error || "Check-in không thành công.");
-    try { localStorage.setItem("ci_name", name); localStorage.setItem("ci_mssv", mssv); } catch(e){}
-    $("rName").textContent = name; $("rMssv").textContent = mssv;
-    $("rTime").textContent = data.time + " · " + data.day.split("-").reverse().join("/");
-    $("rDist").textContent = data.distance + " m";
-    $("formPanel").hidden = true; $("receipt").hidden = false;
-    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    store("ci_name", name); store("ci_mssv", mssv);
+    const r = { name, mssv, time:data.time, day:data.day, distance:data.distance };
+    store("ci_receipt", JSON.stringify(r));
+    showReceipt(r);
   } catch (e){
     fm.hidden = false; fm.textContent = e.message === "Failed to fetch" ? "Không kết nối được máy chủ. Kiểm tra mạng và thử lại." : e.message;
   } finally {
