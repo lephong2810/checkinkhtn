@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Điểm danh Khoa Hóa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column — location gauge on top, form below, receipt replaces form on success */
+:root{
+  --bg:#eef2f4; --surface:#ffffff; --ink:#0f2433; --muted:#5b6f7c; --line:#d3dde3;
+  --accent:#0b5d7a; --accent-ink:#ffffff;
+  --ok:#1d7a4c; --ok-bg:#e3f3ea; --warn:#a15c00; --warn-bg:#fbefdc; --bad:#b3261e; --bad-bg:#fbe5e3;
+  --f-body:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0c161d; --surface:#13222c; --ink:#e4edf2; --muted:#93a8b5; --line:#24394a;
+  --accent:#4fb3d6; --accent-ink:#06202b;
+  --ok:#6fd39f; --ok-bg:#12301f; --warn:#f0b558; --warn-bg:#352612; --bad:#ff8a80; --bad-bg:#3a1714;
+  color-scheme:dark;
+}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);
+  padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.wrap{max-width:440px;margin:0 auto;display:grid;gap:16px}
+header{display:grid;gap:2px}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.gauge{display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:center}
+.gauge svg{width:120px;height:120px;display:block}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px}
+.chip::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.chip.ok{color:var(--ok);background:var(--ok-bg)} .chip.warn{color:var(--warn);background:var(--warn-bg)}
+.chip.bad{color:var(--bad);background:var(--bad-bg)} .chip.idle{color:var(--muted);background:var(--bg)}
+.stats{display:grid;gap:6px;margin-top:10px;font-size:13px;color:var(--muted)}
+.stats b{font-family:var(--f-mono);font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.big{font-family:var(--f-mono);font-size:28px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1}
+.big small{font-size:14px;color:var(--muted)}
+form{display:grid;gap:14px}
+label{display:grid;gap:6px;font-size:13px;font-weight:600}
+input{font:inherit;font-size:16px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);width:100%}
+input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+button{font:inherit;font-weight:700;font-size:16px;border:0;border-radius:10px;padding:14px;cursor:pointer;background:var(--accent);color:var(--accent-ink)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line);padding:10px;font-size:14px}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.msg{font-size:14px;padding:10px 12px;border-radius:10px}
+.msg.bad{color:var(--bad);background:var(--bad-bg)} .msg.warn{color:var(--warn);background:var(--warn-bg)}
+.receipt{display:grid;gap:10px;text-align:center}
+.receipt .tick{width:56px;height:56px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:grid;place-items:center;margin:0 auto;font-size:30px;font-weight:800}
+.receipt dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;text-align:left;margin:6px 0 0;font-size:14px}
+.receipt dt{color:var(--muted)} .receipt dd{margin:0;font-weight:600;font-family:var(--f-mono)}
+.note{font-size:12px;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:no-preference){.pulse{animation:p 1.6s ease-out infinite}@keyframes p{0%{r:5;opacity:.6}100%{r:14;opacity:0}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="eyebrow">ĐH Khoa học Tự nhiên · Khoa Hóa học</span>
+    <h1>Điểm danh</h1>
+  </header>
+
+  <section class="panel" aria-live="polite">
+    <div class="gauge">
+      <svg id="radar" viewBox="0 0 120 120" role="img" aria-label="Vị trí của bạn so với trường">
+        <circle cx="60" cy="60" r="56" fill="none" stroke="var(--line)" stroke-dasharray="3 4"/>
+        <circle id="zone" cx="60" cy="60" r="28" fill="var(--ok-bg)" stroke="var(--ok)" stroke-width="1.5"/>
+        <path d="M60 52v16M52 60h16" stroke="var(--ok)" stroke-width="2"/>
+        <g id="me" hidden>
+          <circle id="meAcc" cx="60" cy="60" r="0" fill="var(--accent)" opacity=".15"/>
+          <circle id="mePulse" class="pulse" cx="60" cy="60" r="5" fill="var(--accent)"/>
+          <circle id="meDot" cx="60" cy="60" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>
+        </g>
+      </svg>
+      <div>
+        <span id="chip" class="chip idle">Chưa có vị trí</span>
+        <div class="big" id="dist" style="margin-top:8px">— <small>m</small></div>
+        <div class="stats">
+          <span>Bán kính cho phép <b id="rad">—</b></span>
+          <span>Sai số GPS <b id="acc">—</b></span>
+        </div>
+      </div>
+    </div>
+    <div id="gpsMsg" class="msg warn" style="margin-top:14px" hidden></div>
+    <button id="locBtn" class="ghost" type="button" style="width:100%;margin-top:14px">Bật định vị</button>
+  </section>
+
+  <section class="panel" id="formPanel">
+    <form id="form" novalidate>
+      <label for="name">Họ và tên
+        <input id="name" name="name" autocomplete="name" placeholder="Nguyễn Văn A" required>
+      </label>
+      <label for="mssv">MSSV
+        <input id="mssv" name="mssv" inputmode="numeric" pattern="\d{6,10}" maxlength="10" placeholder="23147043" required>
+      </label>
+      <div id="formMsg" class="msg bad" hidden></div>
+      <button id="submit" type="submit" disabled>Check-in</button>
+    </form>
+  </section>
+
+  <section class="panel receipt" id="receipt" hidden>
+    <div class="tick" aria-hidden="true">✓</div>
+    <strong style="font-size:18px">Đã check-in</strong>
+    <dl>
+      <dt>Họ tên</dt><dd id="rName"></dd>
+      <dt>MSSV</dt><dd id="rMssv"></dd>
+      <dt>Thời gian</dt><dd id="rTime"></dd>
+      <dt>Cách trường</dt><dd id="rDist"></dd>
+    </dl>
+  </section>
+
+  <p class="note">Nút Check-in chỉ mở khi bạn ở trong khuôn viên trường.</p>
+</div>
+
+<script>
+/* ===== CẤU HÌNH ===== */
+const API_URL = "https://script.google.com/macros/s/AKfycbw807gDPjcav3qPUh-eKaFpmFEeTrIgtwO51VFY8AKAIe_wJmxA6kWklyFE58cJCc6PzQ/exec";                     // dán URL web app Apps Script (…/exec) vào đây
+const SCHOOL = { lat: 10.876373, lng: 106.799248 };
+const RADIUS_M = 300;                     // phải khớp với Code.gs
+const MAX_ACCURACY_M = 150;
+/* ==================== */
+
+const $ = id => document.getElementById(id);
+let pos = null, watchId = null, sending = false;
+
+$("rad").textContent = RADIUS_M + " m";
+
+try { $("name").value = localStorage.getItem("ci_name") || ""; $("mssv").value = localStorage.getItem("ci_mssv") || ""; } catch(e){}
+
+function haversine(a, b, c, d){
+  const R = 6371000, r = Math.PI/180, dLat = (c-a)*r, dLng = (d-b)*r;
+  const x = Math.sin(dLat/2)**2 + Math.cos(a*r)*Math.cos(c*r)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(x));
+}
+
+function state(){
+  if (!pos) return "idle";
+  if (pos.dist > RADIUS_M) return "bad";
+  if (pos.acc > MAX_ACCURACY_M) return "warn";
+  return "ok";
+}
+
+function render(){
+  const s = state(), chip = $("chip");
+  chip.className = "chip " + s;
+  chip.textContent = { idle:"Chưa có vị trí", ok:"Trong khuôn viên", warn:"GPS chưa chính xác", bad:"Ngoài phạm vi" }[s];
+  if (pos){
+    $("dist").innerHTML = Math.round(pos.dist).toLocaleString("vi-VN") + " <small>m</small>";
+    $("acc").textContent = "±" + Math.round(pos.acc) + " m";
+    // Vẽ radar: khung ngoài = max(2×bán kính, khoảng cách × 1.2)
+    const span = Math.max(RADIUS_M*2, pos.dist*1.2), k = 56/span;
+    const dx = (pos.lng - SCHOOL.lng) * Math.cos(SCHOOL.lat*Math.PI/180) * 111320;
+    const dy = (pos.lat - SCHOOL.lat) * 110540;
+    const x = 60 + dx*k, y = 60 - dy*k;
+    $("zone").setAttribute("r", RADIUS_M*k);
+    ["meDot","mePulse","meAcc"].forEach(id => { $(id).setAttribute("cx", x); $(id).setAttribute("cy", y); });
+    $("meAcc").setAttribute("r", Math.min(56, pos.acc*k));
+    $("me").hidden = false;
+  }
+  $("submit").disabled = s !== "ok" || sending;
+  const m = $("gpsMsg");
+  if (s === "bad"){ m.hidden = false; m.className = "msg bad"; m.textContent = "Bạn cần ở trong bán kính " + RADIUS_M + " m quanh trường để check-in."; }
+  else if (s === "warn"){ m.hidden = false; m.className = "msg warn"; m.textContent = "Đang chờ GPS chính xác hơn. Ra gần cửa sổ hoặc chỗ thoáng."; }
+  else if (s === "ok"){ m.hidden = true; }
+}
+
+function onPos(p){
+  const { latitude:lat, longitude:lng, accuracy:acc } = p.coords;
+  pos = { lat, lng, acc, dist: haversine(lat, lng, SCHOOL.lat, SCHOOL.lng) };
+  $("locBtn").hidden = true;
+  render();
+}
+
+function onErr(e){
+  const m = $("gpsMsg"); m.hidden = false; m.className = "msg bad";
+  m.textContent = e.code === 1
+    ? "Bạn đã chặn quyền vị trí. Mở cài đặt trình duyệt, cho phép Vị trí cho trang này rồi tải lại."
+    : e.code === 3 ? "Lấy vị trí quá lâu. Bấm “Bật định vị” để thử lại."
+    : "Không lấy được vị trí. Kiểm tra đã bật GPS/Dịch vụ định vị trên điện thoại.";
+  $("locBtn").hidden = false;
+}
+
+function startGPS(){
+  if (!("geolocation" in navigator)){ onErr({code:0}); return; }
+  if (!window.isSecureContext){ const m=$("gpsMsg"); m.hidden=false; m.className="msg bad"; m.textContent="Trang phải chạy qua https:// thì mới lấy được GPS."; return; }
+  const m = $("gpsMsg"); m.hidden = false; m.className = "msg warn"; m.textContent = "Đang xác định vị trí…";
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy:true, maximumAge:5000, timeout:20000 });
+}
+
+$("locBtn").addEventListener("click", startGPS);
+// Tự bật nếu đã được cấp quyền trước đó
+if (navigator.permissions) navigator.permissions.query({name:"geolocation"}).then(r => { if (r.state === "granted") startGPS(); }).catch(()=>{});
+
+$("form").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const name = $("name").value.trim().replace(/\s+/g," "), mssv = $("mssv").value.trim();
+  const fm = $("formMsg"); fm.hidden = true;
+  if (name.length < 2){ fm.hidden=false; fm.textContent="Vui lòng nhập họ tên."; return; }
+  if (!/^\d{6,10}$/.test(mssv)){ fm.hidden=false; fm.textContent="MSSV chỉ gồm 6–10 chữ số."; return; }
+  if (state() !== "ok") return;
+  if (!API_URL){ fm.hidden=false; fm.textContent="Chưa cấu hình API_URL trong index.html."; return; }
+
+  sending = true; $("submit").textContent = "Đang gửi…"; render();
+  try {
+    const res = await fetch(API_URL, {
+      method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" },
+      body: JSON.stringify({ name, mssv, lat:pos.lat, lng:pos.lng, accuracy:pos.acc, ua:navigator.userAgent })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Check-in không thành công.");
+    try { localStorage.setItem("ci_name", name); localStorage.setItem("ci_mssv", mssv); } catch(e){}
+    $("rName").textContent = name; $("rMssv").textContent = mssv;
+    $("rTime").textContent = data.time + " · " + data.day.split("-").reverse().join("/");
+    $("rDist").textContent = data.distance + " m";
+    $("formPanel").hidden = true; $("receipt").hidden = false;
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  } catch (e){
+    fm.hidden = false; fm.textContent = e.message === "Failed to fetch" ? "Không kết nối được máy chủ. Kiểm tra mạng và thử lại." : e.message;
+  } finally {
+    sending = false; $("submit").textContent = "Check-in"; render();
+  }
+});
+render();
+</script>
+</body>
+</html>
